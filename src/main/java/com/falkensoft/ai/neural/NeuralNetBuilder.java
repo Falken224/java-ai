@@ -1,5 +1,7 @@
 package com.falkensoft.ai.neural;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -16,15 +18,27 @@ public class NeuralNetBuilder {
 
     public NeuralNet build()
     {
+        List<NeuralNet.Connection> connections = new ArrayList<>();
         NeuralNet ret = new NeuralNet();
         ret.inputCount = inputCount;
-        ret.outputs = new double[outputCount];
-        if(weightMatrix==null)
-        {
-            weightMatrix = new double[(inputCount+1)*outputCount];
-        }
-        ret.weightMatrix = weightMatrix;
         ret.activationFunction = activationFunction;
+        int weightIndex=0;
+        int nodeId=1;
+        for(int input=0; input<inputCount; input++)
+        {
+            connections.add(new NeuralNet.Connection(0,nodeId++,0));
+        }
+        for(int output=0; output<outputCount; output++)
+        {
+            for(int input=1; input<=inputCount; input++)
+            {
+                connections.add(new NeuralNet.Connection(input,nodeId,weightMatrix[weightIndex++]));
+            }
+            connections.add(new NeuralNet.Connection(0,nodeId,-weightMatrix[weightIndex++]));
+        }
+        ret.connectionList = connections;
+        ret.totalNodes = nodeId;
+        ret.outputNodeIndex = ret.totalNodes-outputCount;
         return ret;
     }
 
