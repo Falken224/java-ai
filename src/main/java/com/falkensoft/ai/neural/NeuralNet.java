@@ -34,9 +34,9 @@ public class NeuralNet {
         }
     }
 
-    public static NeuralNetBuilder define()
+    public static NeuralNetBuilder.StepOneBuilder define()
     {
-        return new NeuralNetBuilder();
+        return new NeuralNetBuilder().start();
     }
 
     public NeuralNet setInputs(double... inputs)

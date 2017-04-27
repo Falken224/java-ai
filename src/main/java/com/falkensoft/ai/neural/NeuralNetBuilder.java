@@ -1,68 +1,134 @@
 package com.falkensoft.ai.neural;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
 
 /**
  * Created by Falken224 on 4/22/2017.
  */
 public class NeuralNetBuilder {
 
-    private Function<Double,Double> activationFunction=ActivationFunctions::sigmoid;
-    private Integer inputCount=1;
-    private Integer outputCount=1;
-    private double[] weightMatrix;
-
     NeuralNetBuilder(){}
 
-    public NeuralNet build()
+    public StepOneBuilder start()
     {
-        List<NeuralNet.Connection> connections = new ArrayList<>();
-        NeuralNet ret = new NeuralNet();
-        ret.inputCount = inputCount;
-        ret.activationFunction = activationFunction;
-        int weightIndex=0;
-        int nodeId=1;
-        for(int input=0; input<inputCount; input++)
+        return new StepOneBuilder();
+    }
+
+    public class BaseBuilder
+    {
+        protected List<Integer> layerSizes = new ArrayList<>();
+        protected Function<Double,Double> activationFunction=ActivationFunctions::sigmoid;
+    }
+
+    public class StepOneBuilder extends BaseBuilder
+    {
+        private StepOneBuilder(){}
+        public StepTwoBuilder inputs(int inputCount)
         {
-            connections.add(new NeuralNet.Connection(0,nodeId++,0));
+            this.layerSizes.add(inputCount);
+            return new StepTwoBuilder(this);
         }
-        for(int output=0; output<outputCount; output++)
+        public StepOneBuilder activation(Function<Double,Double> func)
         {
-            for(int input=1; input<=inputCount; input++)
-            {
-                connections.add(new NeuralNet.Connection(input,nodeId,weightMatrix[weightIndex++]));
+            this.activationFunction = func;
+            return this;
+        }
+    }
+
+    public class StepTwoBuilder extends BaseBuilder
+    {
+        private StepTwoBuilder(StepOneBuilder one)
+        {
+            this.layerSizes = one.layerSizes;
+            this.activationFunction = one.activationFunction;
+        }
+
+        public StepTwoBuilder addIntermediate(int neuronCount)
+        {
+            this.layerSizes.add(neuronCount);
+            return this;
+        }
+
+        public StepTwoBuilder activation(Function<Double,Double> func)
+        {
+            this.activationFunction = func;
+            return this;
+        }
+
+        public StepThreeBuilder outputs(int outputCount)
+        {
+            this.layerSizes.add(outputCount);
+            return new StepThreeBuilder(this);
+        }
+    }
+
+    public class StepThreeBuilder extends BaseBuilder {
+        private StepThreeBuilder(StepTwoBuilder two) {
+            this.layerSizes = two.layerSizes;
+            this.activationFunction = two.activationFunction;
+        }
+
+        public StepThreeBuilder activation(Function<Double,Double> func)
+        {
+            this.activationFunction = func;
+            return this;
+        }
+
+        public NeuralNet build(double... weights)
+        {
+            List<NeuralNet.Connection> connections = new ArrayList<>();
+            NeuralNet ret = new NeuralNet();
+            int[] previousLayer=null;
+            Iterator<Double> weightIterator;
+            if(weights!=null && weights.length>0) {
+                weightIterator = DoubleStream.of(weights).iterator();
+            } else {
+                weightIterator = DoubleStream.generate(() -> ThreadLocalRandom.current().nextDouble()).iterator();
             }
-            connections.add(new NeuralNet.Connection(0,nodeId,-weightMatrix[weightIndex++]));
+            int nextNodeId = 1;
+            for(int loop=0; loop<layerSizes.size(); loop++)
+            {
+                int[] newLayer = IntStream.range(nextNodeId,nextNodeId+(Integer)layerSizes.get(loop)).toArray();
+                appendLayer(connections,previousLayer,newLayer,weightIterator);
+                nextNodeId+=(Integer)layerSizes.get(loop);
+                previousLayer=newLayer;
+            }
+            if(weightIterator.hasNext() && weights!=null && weights.length>0)
+            {
+                throw new IllegalStateException("Too many weights provided for the given network topology.");
+            }
+            ret.activationFunction = activationFunction;
+            ret.totalNodes=nextNodeId-1;
+            ret.connectionList = connections;
+            ret.outputNodeIndex = ret.totalNodes-(Integer)layerSizes.get(layerSizes.size()-1);
+            ret.inputCount = layerSizes.get(0);
+            return ret;
         }
-        ret.connectionList = connections;
-        ret.totalNodes = nodeId;
-        ret.outputNodeIndex = ret.totalNodes-outputCount;
-        return ret;
-    }
 
-    public NeuralNetBuilder inputs(int inputCount)
-    {
-        this.inputCount = inputCount;
-        return this;
-    }
-
-    public NeuralNetBuilder outputs(int outputCount)
-    {
-        this.outputCount = outputCount;
-        return this;
-    }
-
-    public NeuralNetBuilder activation(Function<Double,Double> func)
-    {
-        this.activationFunction = func;
-        return this;
-    }
-
-    public NeuralNetBuilder weightMatrix(double... weightMatrix)
-    {
-        this.weightMatrix = weightMatrix;
-        return this;
+        private void appendLayer(List<NeuralNet.Connection> connections, int[] firstLayer, int[] secondLayer, Iterator<Double> it)
+        {
+            try {
+                if (firstLayer == null) {
+                    for (int loop = 0; loop < secondLayer.length; loop++) {
+                        connections.add(new NeuralNet.Connection(0, secondLayer[loop], 0));
+                    }
+                } else {
+                    for (int secondNode = 0; secondNode < secondLayer.length; secondNode++) {
+                        for (int firstNode = 0; firstNode < firstLayer.length; firstNode++) {
+                            connections.add(new NeuralNet.Connection(firstLayer[firstNode], secondLayer[secondNode], it.next()));
+                        }
+                        connections.add(new NeuralNet.Connection(0, secondLayer[secondNode], -it.next()));
+                    }
+                }
+            }
+            catch(NoSuchElementException ex)
+            {
+                throw new IllegalStateException("Too few weights were provided for the given network topology!");
+            }
+        }
     }
 }
