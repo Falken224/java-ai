@@ -18,13 +18,18 @@ public class NeuralNetBuilder {
         return new StepOneBuilder();
     }
 
-    public class BaseBuilder
+    public abstract class BaseBuilder<T>
     {
         protected List<Integer> layerSizes = new ArrayList<>();
         protected Function<Double,Double> activationFunction=ActivationFunctions::sigmoid;
+        public T activation(Function<Double,Double> func)
+        {
+            this.activationFunction = func;
+            return (T)this;
+        }
     }
 
-    public class StepOneBuilder extends BaseBuilder
+    public class StepOneBuilder extends BaseBuilder<StepOneBuilder>
     {
         private StepOneBuilder(){}
         public StepTwoBuilder inputs(int inputCount)
@@ -32,14 +37,9 @@ public class NeuralNetBuilder {
             this.layerSizes.add(inputCount);
             return new StepTwoBuilder(this);
         }
-        public StepOneBuilder activation(Function<Double,Double> func)
-        {
-            this.activationFunction = func;
-            return this;
-        }
     }
 
-    public class StepTwoBuilder extends BaseBuilder
+    public class StepTwoBuilder extends BaseBuilder<StepTwoBuilder>
     {
         private StepTwoBuilder(StepOneBuilder one)
         {
@@ -47,15 +47,9 @@ public class NeuralNetBuilder {
             this.activationFunction = one.activationFunction;
         }
 
-        public StepTwoBuilder addIntermediate(int neuronCount)
+        public StepTwoBuilder addIntermediate(Integer... neuronCount)
         {
-            this.layerSizes.add(neuronCount);
-            return this;
-        }
-
-        public StepTwoBuilder activation(Function<Double,Double> func)
-        {
-            this.activationFunction = func;
+            this.layerSizes.addAll(Arrays.asList(neuronCount));
             return this;
         }
 
@@ -66,16 +60,10 @@ public class NeuralNetBuilder {
         }
     }
 
-    public class StepThreeBuilder extends BaseBuilder {
+    public class StepThreeBuilder extends BaseBuilder<StepThreeBuilder> {
         private StepThreeBuilder(StepTwoBuilder two) {
             this.layerSizes = two.layerSizes;
             this.activationFunction = two.activationFunction;
-        }
-
-        public StepThreeBuilder activation(Function<Double,Double> func)
-        {
-            this.activationFunction = func;
-            return this;
         }
 
         public NeuralNet build(double... weights)
