@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Created by Falken224 on 4/22/2017.
@@ -54,6 +55,30 @@ public class NeuralNet {
         }
         valCache.clear();
         return this;
+    }
+
+    public List<Double> weights()
+    {
+        return connectionList.stream()
+                .filter(conn -> !(conn.source==0 && conn.destination<=inputCount))
+                .map(connection -> connection.weight)
+                .collect(Collectors.toList());
+    }
+
+    public void setWeights(List<Double> weights)
+    {
+        if(weights==null || weights.size()!=connectionList.size()-inputCount)
+            throw new IllegalArgumentException("New weight values MUST be the same quantity as the defined connections in the network.");
+        int index=0;
+        for(Double weight : weights)
+        {
+            while(connectionList.get(index).destination<=inputCount && connectionList.get(index).source==0)
+            {
+                index++;
+            }
+            connectionList.get(index).weight=weight;
+        }
+        valCache.clear();
     }
 
     public static double getNodeValue(List<Connection> connectionList, int nodeId, Function <Double, Double> activation, Map<Integer,Double> valueCache)
